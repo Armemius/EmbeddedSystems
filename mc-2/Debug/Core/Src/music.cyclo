@@ -1,0 +1,4 @@
+../Core/Src/music.c:7:6:init_music	1
+../Core/Src/music.c:13:6:play_note	1
+../Core/Src/music.c:21:6:stop_note	1
+../Core/Src/music.c:26:6:play_amogus	2
