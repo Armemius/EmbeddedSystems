@@ -88,6 +88,15 @@ char *i64toa(int64_t v, char *buf)
     return buf;
 }
 
+int max(int a, int b)
+{
+	return (a > b) ? a : b;
+}
+
+int abs(int a) {
+	return (a > 0) ? a : -a;
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -154,11 +163,14 @@ int main(void)
     int32_t a = 0;
     int32_t b = 0;
     int32_t c = 0;
-    char old = 0, ch = 0;
+    char old = 0, ch = -1;
 //  	play_amogus();
 //  	handlers[0] = show_code;
     oled_SetCursor(5, 5);
 	oled_Fill(0);
+	oled_WriteString("Input operand A", Font_7x10, 1);
+	oled_DrawHLine(0, OLED_WIDTH, 17, 1);
+	oled_SetCursor(5, 5 + 20);
 	oled_WriteChar('0', Font_7x10, 1);
 	oled_UpdateScreen();
 	while (1)
@@ -219,16 +231,29 @@ int main(void)
 			snprintf(buf_b, sizeof(buf_b), "%ld", b);
 		}
 	}
-	oled_SetCursor(5, 5);
+
 	oled_Fill(0);
+	oled_SetCursor(5, 5);
+	if (state == 1 || (state == 0 && a_size == 8)) {
+		oled_WriteString("Select operation", Font_7x10, 1);
+	} else if (state == 0) {
+		oled_WriteString("Input operand A", Font_7x10, 1);
+	} else if (state == 2) {
+		oled_WriteString("Input operand B", Font_7x10, 1);
+	} else if (state == 3) {
+		oled_WriteString("Results", Font_7x10, 1);
+	}
+	oled_DrawHLine(0, OLED_WIDTH, 17, 1);
+	oled_SetCursor(5 + (b_size > a_size ? 7 * abs(a_size - b_size) : 0), 5 + 20);
 	oled_WriteString(buf_a, Font_7x10, 1);
 
 	if (state > 0) {
+		oled_SetCursor(7 + 7 * max(a_size, b_size), 5 + 20 + 6);
 		oled_WriteChar(opcodes[opcode], Font_7x10, 1);
 	}
 
 	if (state > 1) {
-		oled_SetCursor(5, 15);
+		oled_SetCursor(5 + (b_size < a_size ? 7 * abs(a_size - max(1, b_size)) : 0), 15 + 20);
 		oled_WriteString(buf_b, Font_7x10, 1);
 	}
 	if (state == 3) {
@@ -254,8 +279,8 @@ int main(void)
 		}
 	}
 	if (state > 2) {
-		oled_WriteChar('=', Font_7x10, 1);
-		oled_SetCursor(5, 25);
+		oled_DrawHLine(4, 6 + max(a_size, b_size) * 7, 25+20, 1);
+		oled_SetCursor(5, 25 + 23);
 		oled_WriteString(buf_c, Font_7x10, 1);
 	}
 
@@ -288,7 +313,7 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
   RCC_OscInitStruct.PLL.PLLM = 8;
-  RCC_OscInitStruct.PLL.PLLN = 84;
+  RCC_OscInitStruct.PLL.PLLN = 72;
   RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
   RCC_OscInitStruct.PLL.PLLQ = 4;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
@@ -303,7 +328,7 @@ void SystemClock_Config(void)
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
-  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
+  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;
 
   if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
   {
