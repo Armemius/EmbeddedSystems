@@ -36,6 +36,15 @@
 #define INPUT_QUEUE_LENGTH 8U
 #define CMD_RESTART        0xFF
 
+#define DIFF_EASY   0
+#define DIFF_MEDIUM 1
+#define DIFF_HARD   2
+#define DIFF_EXTREME 3
+#define DIFF_COUNT  4
+
+#define CMD_MENU_UP    0xF0
+#define CMD_MENU_DOWN  0xF1
+
 typedef enum {
   DIR_UP = 0,
   DIR_RIGHT,
@@ -73,6 +82,9 @@ typedef struct {
 static GameState g_state;
 static uint32_t rng_state = 1U;
 static volatile uint8_t g_dirty = 0U;
+static volatile uint8_t g_menu_active = 1U;
+static uint8_t g_selected_diff = DIFF_EASY;
+static const uint16_t g_diff_step_ms[DIFF_COUNT] = { 150U, 125U, 100U, 75U };
 
 osMessageQueueId_t inputQueueHandle;
 const osMessageQueueAttr_t inputQueue_attributes = {
@@ -121,9 +133,10 @@ static void reset_game(GameState *state);
 static void handle_input(GameState *state, uint8_t cmd);
 static void game_step(GameState *state, uint8_t *ate_food, uint8_t *died);
 static void render_game_full(const GameState *state);
+static void render_menu(uint8_t selected_diff);
 static uint32_t random32(void);
 static uint8_t key_to_command(char key, uint8_t *cmd_out);
-static void draw_cell(uint8_t x, uint8_t y, OLED_COLOR color);
+static void draw_cell(uint8_t x, uint8_t y, OLED_COLOR color, uint8_t is_food);
 /* USER CODE END FunctionPrototypes */
 
 void StartDefaultTask(void *argument);
@@ -259,7 +272,7 @@ void StartGameTask(void *argument)
 {
   /* USER CODE BEGIN StartGameTask */
   TickType_t last_wake_time = xTaskGetTickCount();
-  const TickType_t step_delay = pdMS_TO_TICKS(200);
+  TickType_t step_delay = pdMS_TO_TICKS(g_diff_step_ms[g_selected_diff]);
   uint8_t ate_food = 0;
   uint8_t died = 0;
 
@@ -276,10 +289,29 @@ void StartGameTask(void *argument)
     osMutexAcquire(gameStateMutexHandle, osWaitForever);
     uint8_t cmd;
     while (osMessageQueueGet(inputQueueHandle, &cmd, NULL, 0) == osOK) {
-      handle_input(&g_state, cmd);
+      if (g_menu_active) {
+        if (cmd == CMD_MENU_UP && g_selected_diff > 0) {
+          g_selected_diff--;
+          g_dirty = 1U;
+        } else if (cmd == CMD_MENU_DOWN && g_selected_diff + 1 < DIFF_COUNT) {
+          g_selected_diff++;
+          g_dirty = 1U;
+        } else if (cmd == CMD_RESTART) {
+          g_menu_active = 0U;
+          step_delay = pdMS_TO_TICKS(g_diff_step_ms[g_selected_diff]);
+          last_wake_time = xTaskGetTickCount();
+          reset_game(&g_state);
+          g_dirty = 1U;
+        }
+      } else {
+        handle_input(&g_state, cmd);
+      }
     }
-    game_step(&g_state, &ate_food, &died);
-    g_dirty = 1U;
+
+    if (!g_menu_active) {
+      game_step(&g_state, &ate_food, &died);
+      g_dirty = 1U;
+    }
     osMutexRelease(gameStateMutexHandle);
 
     if (ate_food) {
@@ -293,7 +325,11 @@ void StartGameTask(void *argument)
       stop_note();
     }
 
-    vTaskDelayUntil(&last_wake_time, step_delay);
+    if (!g_menu_active) {
+      vTaskDelayUntil(&last_wake_time, step_delay);
+    } else {
+      osDelay(20);
+    }
   }
   /* USER CODE END StartGameTask */
 }
@@ -322,10 +358,15 @@ void StartRenderTask(void *argument)
     }
     g_dirty = 0U;
     memcpy(&snapshot, &g_state, sizeof(snapshot));
+    uint8_t menu = g_menu_active;
+    uint8_t diff = g_selected_diff;
     osMutexRelease(gameStateMutexHandle);
 
-    render_game_full(&snapshot);
-    osDelay(30);
+    if (menu) {
+      render_menu(diff);
+    } else {
+      render_game_full(&snapshot);
+    }
   }
   /* USER CODE END StartRenderTask */
 }
@@ -340,7 +381,11 @@ static uint8_t key_to_command(char key, uint8_t *cmd_out)
     *cmd_out = CMD_RESTART;
     return 1;
   case '2':
-    *cmd_out = DIR_UP;
+    if (g_menu_active) {
+      *cmd_out = CMD_MENU_UP;
+    } else {
+      *cmd_out = DIR_UP;
+    }
     return 1;
   case '4':
     *cmd_out = DIR_LEFT;
@@ -349,7 +394,11 @@ static uint8_t key_to_command(char key, uint8_t *cmd_out)
     *cmd_out = DIR_RIGHT;
     return 1;
   case '8':
-    *cmd_out = DIR_DOWN;
+    if (g_menu_active) {
+      *cmd_out = CMD_MENU_DOWN;
+    } else {
+      *cmd_out = DIR_DOWN;
+    }
     return 1;
   default:
     return 0;
@@ -501,10 +550,17 @@ static void game_step(GameState *state, uint8_t *ate_food, uint8_t *died)
   }
 }
 
-static void draw_cell(uint8_t x, uint8_t y, OLED_COLOR color)
+static void draw_cell(uint8_t x, uint8_t y, OLED_COLOR color, uint8_t is_food)
 {
   uint8_t base_x = x * CELL_SIZE;
   uint8_t base_y = y * CELL_SIZE;
+
+  if (is_food) {
+	  oled_DrawSquare(base_x, base_x + CELL_SIZE - 1, base_y, base_y + CELL_SIZE - 1, White);
+	  oled_DrawSquare(base_x + 3, base_x + CELL_SIZE - 1 - 3, base_y + 3, base_y + CELL_SIZE - 1 - 3, White);
+	  return;
+  }
+
   for (uint8_t dy = 0; dy < CELL_SIZE; ++dy) {
     for (uint8_t dx = 0; dx < CELL_SIZE; ++dx) {
       oled_DrawPixel((uint8_t)(base_x + dx), (uint8_t)(base_y + dy), color);
@@ -531,11 +587,39 @@ static void render_game_full(const GameState *state)
     return;
   }
 
-  draw_cell(state->food.x, state->food.y, White);
+  oled_DrawHLine(0, OLED_WIDTH - 1, 0, White);
+  oled_DrawHLine(0, OLED_WIDTH - 1, OLED_HEIGHT - 1, White);
+  oled_DrawVLine(0, OLED_HEIGHT - 1, 0, White);
+  oled_DrawVLine(0, OLED_HEIGHT - 1, OLED_WIDTH - 1, White);
+
+  draw_cell(state->food.x, state->food.y, White, 1);
   for (uint16_t i = 0; i < state->length; ++i) {
-    draw_cell(state->body[i].x, state->body[i].y, White);
+    draw_cell(state->body[i].x, state->body[i].y, White, 0);
   }
   oled_UpdateScreen();
 }
-/* USER CODE END Application */
 
+static void render_menu(uint8_t selected_diff)
+{
+  oled_Fill(Black);
+  oled_SetCursor(6, 6);
+  oled_WriteString("Select difficulty", Font_7x10, White);
+
+  oled_DrawHLine(0, OLED_WIDTH, 20, 1);
+
+  const char *labels[DIFF_COUNT] = { "Easy", "Medium", "Hard", "Extreme" };
+  for (uint8_t i = 0; i < DIFF_COUNT; ++i) {
+    oled_SetCursor(10, 23 + i * 10);
+    if (i == selected_diff) {
+      oled_WriteString("> ", Font_7x10, White);
+    } else {
+      oled_WriteString("  ", Font_7x10, White);
+    }
+    oled_WriteString((char *)labels[i], Font_7x10, White);
+  }
+
+  oled_SetCursor(6, 58);
+  oled_WriteString("2/8:select  #:start", Font_7x10, White);
+  oled_UpdateScreen();
+}
+/* USER CODE END Application */

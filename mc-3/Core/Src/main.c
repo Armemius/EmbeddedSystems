@@ -103,12 +103,12 @@ int main(void)
 
   oled_Fill(1);
   oled_SetCursor(8, 5);
-  oled_WriteString("SDK-1.1 Snake", Font_7x10, 0);
-  oled_SetCursor(8, 5 + 12);
+  oled_WriteString("Snake", Font_11x18, 0);
+  oled_SetCursor(8, 5 + 8 + 12);
   oled_WriteString("By Armemius", Font_7x10, 0);
-  oled_SetCursor(8, 5 + 12 * 2);
+  oled_SetCursor(8, 5 + 8 + 12 * 2);
   oled_WriteString("2/4/6/8 - move", Font_7x10, 0);
-  oled_SetCursor(8, 5 + 12 * 3);
+  oled_SetCursor(8, 5 + 8 + 12 * 3);
   oled_WriteString("# - to restart", Font_7x10, 0);
   oled_SetCursor(8, 45);
   oled_UpdateScreen();
