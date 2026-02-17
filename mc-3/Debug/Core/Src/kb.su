@@ -1,0 +1,4 @@
+../Core/Src/kb.c:5:19:kb_init	16	static
+../Core/Src/kb.c:27:9:kb_check_row	24	static
+../Core/Src/kb.c:61:9:kb_get_key	24	static
+../Core/Src/kb.c:74:6:kb_get_symb	32	static

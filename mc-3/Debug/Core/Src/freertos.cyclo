@@ -1,0 +1,16 @@
+../Core/Src/freertos.c:140:6:vApplicationMallocFailedHook	1
+../Core/Src/freertos.c:151:6:MX_FREERTOS_Init	1
+../Core/Src/freertos.c:205:6:StartDefaultTask	1
+../Core/Src/freertos.c:223:6:StartInputTask	4
+../Core/Src/freertos.c:258:6:StartGameTask	4
+../Core/Src/freertos.c:308:6:StartRenderTask	2
+../Core/Src/freertos.c:336:16:key_to_command	6
+../Core/Src/freertos.c:359:16:is_opposite	9
+../Core/Src/freertos.c:367:17:random32	1
+../Core/Src/freertos.c:373:13:cell_occupied	4
+../Core/Src/freertos.c:383:13:place_food	7
+../Core/Src/freertos.c:409:13:reset_game	2
+../Core/Src/freertos.c:428:13:handle_input	4
+../Core/Src/freertos.c:443:13:game_step	20
+../Core/Src/freertos.c:504:13:draw_cell	3
+../Core/Src/freertos.c:517:13:render_game_full	3
